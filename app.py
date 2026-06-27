@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy import stats
 
-# ── Konfigurasi halaman ──────────────────────────────────────────────────────
 st.set_page_config(
     page_title="Analisis Penjualan & Curah Hujan",
     page_icon="🌧️",
@@ -15,7 +14,6 @@ st.set_page_config(
 st.title("🌧️ Dashboard Analisis Penjualan & Curah Hujan")
 st.markdown("---")
 
-# ── Load data ────────────────────────────────────────────────────────────────
 @st.cache_data
 def load_data():
     df = pd.read_csv("dataset.csv")
@@ -27,22 +25,18 @@ def load_data():
 
 df = load_data()
 
-# ── Sidebar filter ───────────────────────────────────────────────────────────
 with st.sidebar:
     st.header("⚙️ Filter Data")
-    
     kegiatan_filter = st.multiselect(
         "Status Kegiatan",
         options=["Aktif", "Libur"],
         default=["Aktif", "Libur"],
     )
-    
     hari_filter = st.multiselect(
         "Hari",
         options=["Minggu","Senin","Selasa","Rabu","Kamis","Jumat","Sabtu"],
         default=["Minggu","Senin","Selasa","Rabu","Kamis","Jumat","Sabtu"],
     )
-    
     curah_range = st.slider(
         "Rentang Curah Hujan (mm)",
         float(df["Curah Hujan (mm)"].min()),
@@ -50,7 +44,6 @@ with st.sidebar:
         (float(df["Curah Hujan (mm)"].min()), float(df["Curah Hujan (mm)"].max())),
     )
 
-# Terapkan filter
 mask = (
     df["Status Kegiatan"].isin(kegiatan_filter) &
     df["Nama Hari"].isin(hari_filter) &
@@ -58,18 +51,17 @@ mask = (
 )
 df_f = df[mask].copy()
 
-# ── KPI cards ────────────────────────────────────────────────────────────────
+# ── KPI ─────────────────────────────────────────────────────────────────────
 st.subheader("📊 Ringkasan Statistik")
 c1, c2, c3, c4, c5 = st.columns(5)
-c1.metric("Total Data",        f"{len(df_f)} baris")
-c2.metric("Total Penjualan",   f"{df_f['Penjualan (pcs)'].sum():,} pcs")
+c1.metric("Total Data",          f"{len(df_f)} baris")
+c2.metric("Total Penjualan",     f"{df_f['Penjualan (pcs)'].sum():,} pcs")
 c3.metric("Rata-rata Penjualan", f"{df_f['Penjualan (pcs)'].mean():.1f} pcs")
-c4.metric("Curah Hujan Maks",  f"{df_f['Curah Hujan (mm)'].max():.1f} mm")
-c5.metric("Hari Aktif",        f"{(df_f['Kegiatan']==1).sum()} hari")
-
+c4.metric("Curah Hujan Maks",    f"{df_f['Curah Hujan (mm)'].max():.1f} mm")
+c5.metric("Hari Aktif",          f"{(df_f['Kegiatan']==1).sum()} hari")
 st.markdown("---")
 
-# ── Baris 1: Scatter + Bar hari ─────────────────────────────────────────────
+# ── Scatter + Bar ────────────────────────────────────────────────────────────
 col1, col2 = st.columns(2)
 
 with col1:
@@ -78,8 +70,6 @@ with col1:
     colors = df_f["Kegiatan"].map({0: "tomato", 1: "steelblue"})
     ax.scatter(df_f["Curah Hujan (mm)"], df_f["Penjualan (pcs)"],
                c=colors, alpha=0.7, edgecolors="white", linewidth=0.5)
-
-    # Garis regresi
     if len(df_f) > 2:
         slope, intercept, r, p, _ = stats.linregress(
             df_f["Curah Hujan (mm)"], df_f["Penjualan (pcs)"])
@@ -87,8 +77,6 @@ with col1:
                              df_f["Curah Hujan (mm)"].max(), 100)
         ax.plot(x_line, slope * x_line + intercept, "k--", lw=1.5,
                 label=f"r={r:.2f}, p={p:.3f}")
-        ax.legend(fontsize=9)
-
     from matplotlib.patches import Patch
     ax.legend(handles=[
         Patch(color="steelblue", label="Aktif"),
@@ -112,28 +100,35 @@ with col2:
     ax2.bar_label(bars, fmt="%.0f", fontsize=8, padding=2)
     ax2.set_xlabel("Hari")
     ax2.set_ylabel("Rata-rata Penjualan (pcs)")
-    ax2.set_title("Rata-rata Penjualan per Hari dalam Seminggu")
+    ax2.set_title("Rata-rata Penjualan per Hari")
     plt.xticks(rotation=30, ha="right")
     plt.tight_layout()
     st.pyplot(fig2)
     plt.close()
 
-# ── Baris 2: Box + Heatmap ──────────────────────────────────────────────────
+# ── Boxplot + Heatmap ────────────────────────────────────────────────────────
 col3, col4 = st.columns(2)
 
 with col3:
     st.subheader("📦 Distribusi Penjualan: Aktif vs Libur")
     fig3, ax3 = plt.subplots(figsize=(6, 4))
-    data_box = [
-        df_f[df_f["Kegiatan"]==1]["Penjualan (pcs)"].values,
-        df_f[df_f["Kegiatan"]==0]["Penjualan (pcs)"].values,
-    ]
-    bp = ax3.boxplot(data_box, labels=["Aktif","Libur"],
-                     patch_artist=True, notch=False)
-    bp["boxes"][0].set_facecolor("steelblue")
-    bp["boxes"][1].set_facecolor("tomato")
+    data_aktif = df_f[df_f["Kegiatan"] == 1]["Penjualan (pcs)"].dropna().values.tolist()
+    data_libur = df_f[df_f["Kegiatan"] == 0]["Penjualan (pcs)"].dropna().values.tolist()
+    data_box = [d for d in [data_aktif, data_libur] if len(d) > 0]
+    tick_labels = []
+    if len(data_aktif) > 0:
+        tick_labels.append("Aktif")
+    if len(data_libur) > 0:
+        tick_labels.append("Libur")
+    if data_box:
+        bp = ax3.boxplot(data_box, patch_artist=True, notch=False)
+        colors_box = ["steelblue", "tomato"]
+        for i, box in enumerate(bp["boxes"]):
+            box.set_facecolor(colors_box[i] if i < len(colors_box) else "gray")
+        ax3.set_xticks(range(1, len(tick_labels) + 1))
+        ax3.set_xticklabels(tick_labels)
     ax3.set_ylabel("Penjualan (pcs)")
-    ax3.set_title("Boxplot Penjualan berdasarkan Status Kegiatan")
+    ax3.set_title("Boxplot Penjualan: Aktif vs Libur")
     plt.tight_layout()
     st.pyplot(fig3)
     plt.close()
@@ -149,7 +144,7 @@ with col4:
     st.pyplot(fig4)
     plt.close()
 
-# ── Baris 3: Histogram penjualan ────────────────────────────────────────────
+# ── Histogram ────────────────────────────────────────────────────────────────
 st.markdown("---")
 st.subheader("📈 Distribusi Frekuensi Penjualan")
 fig5, ax5 = plt.subplots(figsize=(12, 3.5))
@@ -165,7 +160,7 @@ plt.tight_layout()
 st.pyplot(fig5)
 plt.close()
 
-# ── Statistik deskriptif & uji korelasi ─────────────────────────────────────
+# ── Statistik & Korelasi ─────────────────────────────────────────────────────
 st.markdown("---")
 col5, col6 = st.columns(2)
 
@@ -178,16 +173,19 @@ with col5:
 
 with col6:
     st.subheader("🔬 Uji Korelasi Pearson")
-    r, p = stats.pearsonr(df_f["Curah Hujan (mm)"], df_f["Penjualan (pcs)"])
-    st.markdown(f"""
-    | Parameter | Nilai |
-    |-----------|-------|
-    | Koefisien Korelasi (r) | **{r:.4f}** |
-    | p-value | **{p:.4f}** |
-    | Interpretasi | {"Signifikan (p < 0.05)" if p < 0.05 else "Tidak Signifikan (p ≥ 0.05)"} |
-    | Arah Hubungan | {"Positif ➕" if r > 0 else "Negatif ➖"} |
-    | Kekuatan | {"Kuat" if abs(r)>0.6 else "Sedang" if abs(r)>0.3 else "Lemah"} |
-    """)
+    if len(df_f) > 2:
+        r, p = stats.pearsonr(df_f["Curah Hujan (mm)"], df_f["Penjualan (pcs)"])
+        st.markdown(f"""
+| Parameter | Nilai |
+|-----------|-------|
+| Koefisien Korelasi (r) | **{r:.4f}** |
+| p-value | **{p:.4f}** |
+| Interpretasi | {"Signifikan (p < 0.05)" if p < 0.05 else "Tidak Signifikan (p ≥ 0.05)"} |
+| Arah Hubungan | {"Positif ➕" if r > 0 else "Negatif ➖"} |
+| Kekuatan | {"Kuat" if abs(r)>0.6 else "Sedang" if abs(r)>0.3 else "Lemah"} |
+        """)
+    else:
+        st.warning("Data terlalu sedikit untuk uji korelasi.")
 
 # ── Tabel data ───────────────────────────────────────────────────────────────
 st.markdown("---")
